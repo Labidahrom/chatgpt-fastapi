@@ -1,0 +1,8 @@
+*.pyc
+.venv
+dist
+.env
+.idea
+*.sqlite3
+*.log
+add_new_user.py
