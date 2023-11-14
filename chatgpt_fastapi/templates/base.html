@@ -27,31 +27,30 @@
     <ul class="navbar-nav mr-auto">
 
       {% if user %}
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="/login" id="navbarDropdown" role="button" data-toggle="dropdown">
-            {{ user.email }}  <!-- Display user email -->
-          </a>
-            <form action="/auth/logout" method="post">
-                <button type="submit" class="dropdown-item">Выйти</button>
-            </form>
-        </li>
+      <li class="nav-item">
+        <a class="nav-link" href=""> Сгенерировать тексты </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href=""> Результаты генерации </a>
+      </li>
+      </ul>
+    <div class="my-2 my-md-0">
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item">
+          <a class="nav-link" href="">Вы вошли как: {{ user.email }}</a>
+            </li>
+            <li class="nav-item">
+      <a class="nav-link" href="/auth/logout">Выйти</a>
+            </li>
+        </ul>
+    </div>
       {% else %}
         <li class="nav-item">
           <a class="nav-link" href="/login">Войти</a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/auth/register">Регистрация</a>
-        </li>
       {% endif %}
 
     </ul>
-    <div class="my-2 my-md-0">
-        <ul class="navbar-nav mr-auto">
-            <li class="nav-item">
-      <a class="nav-link" href="">Войти</a>
-            </li>
-        </ul>
-    </div>
   </div>
 
 </nav>

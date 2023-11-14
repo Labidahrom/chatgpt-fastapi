@@ -72,14 +72,14 @@ async def read_texts_parsing_sets(session: AsyncSession = Depends(get_async_sess
 
 @app.get("/login", response_class=HTMLResponse)
 async def login(request: Request, user: User = Depends(fastapi_users.current_user(optional=True))):
-    if user and user.is_authenticated:
+    if user and current_user:
         response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
         return response
     return templates.TemplateResponse("login.html", {"request": request})
 
 
 
-@app.post("/auth/logout")
+@app.get("/auth/logout")
 async def logout(request: Request):
     response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     response.delete_cookie('fastapiusersauth')  # Deleting the JWT token cookie

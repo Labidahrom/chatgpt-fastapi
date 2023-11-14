@@ -1,10 +1,9 @@
-<!-- login.html -->
-{% extends "base.html" %}  <!-- Assuming you have a base template like your provided code -->
+{% extends "base.html" %}
 
 {% block content %}
 <div class="container">
     <h2>Login</h2>
-    <form action="/auth/jwt/login" method="post">
+    <form id="loginForm" action="/auth/jwt/login" method="post">
         <div class="form-group">
             <label for="email">Email</label>
             <input type="email" class="form-control" id="email" name="username" required>
@@ -16,4 +15,38 @@
         <button type="submit" class="btn btn-primary">Login</button>
     </form>
 </div>
+<script>
+async function submitLoginForm(event) {
+    event.preventDefault();
+    console.log("Form submission intercepted"); // Log for debugging
+
+    const formData = new FormData(event.target);
+    const response = await fetch('/auth/jwt/login', {
+        method: 'POST',
+        body: formData
+    });
+
+    if (response.ok) {
+        console.log("Login successful, redirecting...");
+        window.location.href = '/';
+    } else {
+        console.log("Login failed", response.status, response.statusText); // Log error details
+        // Handle login failure (e.g., display an error message)
+    }
+}
+
+document.addEventListener('DOMContentLoaded', (event) => {
+    const form = document.getElementById('loginForm');
+    if (form) {
+        form.addEventListener('submit', submitLoginForm);
+        console.log("Event listener attached to the form");
+    } else {
+        console.log("Form not found");
+    }
+});
+</script>
 {% endblock %}
+
+
+
+
