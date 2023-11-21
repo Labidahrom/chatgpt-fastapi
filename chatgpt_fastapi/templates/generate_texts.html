@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container wrapper flex-grow-1">
+    <h1>Сгенерировать тексты по списку запросов</h1>
+Для проверки вставьте запись вида задание на текст||тема текста отдельно'. Пример правильной записи:<br>
+<b>сгенерируй текст на тему ремонт телефонов sony xperia||ремонт телефонов sony xperia</b><br>
+Каждое задание на текст должно начинаться с новой строки. После проверки результат будет на <a href="">этой странице</a>
+<form  class="form-group mt-3" action="/generate_texts" method="post">
+      <label for="set_name">Название набора:</label><br>
+      <input type="text" id="set_name" name="set_name"><br>
+      <label for="temperature">Температура:</label><br>
+      <input type="text" id="temperature" name="temperature"><br><br>
+      <label for="text_len">Минимальная длина текста:</label><br>
+      <input type="text" id="text_len" name="text_len"><br><br>
+      <label for="task_strings">Задание на тексты:</label><br>
+      <textarea id="task_strings" name="task_strings" rows="4" cols="50"></textarea><br><br>
+      <label for="rewriting_task">Задание на переписку текста:</label><br>
+      <textarea id="rewriting_task" name="rewriting_task" rows="4" cols="50"></textarea><br><br>
+      <label for="required_uniqueness">Требуемый процент уникальности:</label><br>
+      <input type="text" id="required_uniqueness" name="required_uniqueness"><br><br>
+    <button type="submit" class="btn btn-primary">Сгенерировать</button>
+</form>
+</div>
+<style>
+textarea {
+    width: 100%; /* Sets the width to 100% of the parent container */
+    height: 150px; /* Sets a fixed height */
+    padding: 12px 20px;
+    box-sizing: border-box; /* Includes padding and border in the element's total width and height */
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    background-color: #f8f8f8;
+    font-size: 16px;
+    resize: vertical; /* Allows vertical resizing */
+}
+input {
+    width: 100%; /* Sets the width to 100% of the parent container */
+    padding: 12px 20px;
+    box-sizing: border-box; /* Includes padding and border in the element's total width and height */
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    background-color: #f8f8f8;
+    font-size: 16px;
+    resize: vertical; /* Allows vertical resizing */
+}
+</style>
+{% endblock %}

@@ -3,11 +3,11 @@ from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel
 from fastapi_users import schemas
-import uuid
+from uuid import UUID
 from chatgpt_fastapi.models import User
 
 
-class UserRead(schemas.BaseUser[uuid.UUID]):
+class UserRead(schemas.BaseUser[UUID]):
     pass
 
 
@@ -22,18 +22,21 @@ class UserUpdate(schemas.BaseUserUpdate):
 
 class TextsParsingSetBase(BaseModel):
     set_name: str
-    total_amount: int
+    total_amount: int = 0
     parsed_amount: int = 0
     is_complete: bool = False
     average_uniqueness: int = 0
     average_attempts_to_uniqueness: int = 0
-    temperature: Decimal = 0
+    temperature: float = 0
     failed_texts: str = ''
     low_uniqueness_texts: str = ''
-    task_strings: str = ''
+    task_strings: str
+    rewriting_task: str = ''
+    required_uniqueness: int = 0
+    text_len: int = 0
 
 class TextsParsingSetCreate(TextsParsingSetBase):
-    author_id: int
+    author_id: UUID
 
 class TextsParsingSet(TextsParsingSetBase):
     id: int
