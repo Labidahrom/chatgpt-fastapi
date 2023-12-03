@@ -1,39 +1,35 @@
-<!-- templates/texts_parsing_sets.html -->
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Texts Parsing Sets</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
+{% extends "base.html" %}
+{% block content %}
     <div class="container mt-4">
-        <h1>Texts Parsing Sets</h1>
+        <h1>Тексты</h1>
         <table class="table table-bordered">
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Set Name</th>
-                    <th>Total Amount</th>
-                    <th>Parsed Amount</th>
-                    <th>Average Uniqueness</th>
-                    <th>Temperature</th>
-                    <th>Created At</th>
+                    <th>Название</th>
+                    <th>Всего текстов</th>
+                    <th>Готово</th>
+                    <th>Средняя уникальность</th>
+                    <th>Температура</th>
+                    <th>Создан</th>
+                    <th>Действия</th>
                 </tr>
             </thead>
             <tbody>
                 {% for set in parsing_sets %}
                     <tr>
-                        <td>{{ set.id }}</td>
+                        <td><a href="/download_text_set/{{ set.id }}">{{ set.id }}</a></td>
                         <td>{{ set.set_name }}</td>
                         <td>{{ set.total_amount }}</td>
                         <td>{{ set.parsed_amount }}</td>
                         <td>{{ set.average_uniqueness }}</td>
                         <td>{{ set.temperature }}</td>
                         <td>{{ set.created_at }}</td>
+                        <td>
+                          <form action="/delete_text_set/{{ set.id }}" method="get">
+                          <input type="submit" value='Удалить'>
+                          </form>
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -44,5 +40,4 @@
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.0.9/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-</body>
-</html>
+{% endblock %}

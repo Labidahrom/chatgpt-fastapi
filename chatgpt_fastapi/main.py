@@ -4,12 +4,13 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from starlette import status
 from starlette.responses import RedirectResponse
+from fastapi.responses import StreamingResponse
 from fastapi.responses import Response
 from typing import Type
 from chatgpt_fastapi.models import Base, TextsParsingSet, User
 from pydantic import BaseModel
 from chatgpt_fastapi.database import User, create_db_and_tables, get_async_session
-from chatgpt_fastapi.parser import generate_texts
+from chatgpt_fastapi.parser import generate_texts, get_text_set, generate_text_set_zip
 from chatgpt_fastapi.schemas import UserCreate, UserRead, UserUpdate, TextsParsingSetCreate, TextsParsingSetBase
 from chatgpt_fastapi.users import auth_backend, current_active_user, fastapi_users
 
@@ -28,7 +29,6 @@ templates = Jinja2Templates(directory="chatgpt_fastapi/templates")
 def make_parsing_form(cls: Type[BaseModel]):
     async def _parse_form_data(request: Request):
         form = await request.form()
-        print('form from request: in make_parsing_form', form)
         return cls(**form)
 
     return _parse_form_data
@@ -77,7 +77,7 @@ async def home(request: Request, user: User = Depends(fastapi_users.current_user
 @app.get("/texts_list", response_class=HTMLResponse)
 async def read_texts_parsing_sets(request: Request, user: User = Depends(fastapi_users.current_user()),
                                   session: AsyncSession = Depends(get_async_session)):
-    result = await session.execute(select(TextsParsingSet))
+    result = await session.execute(select(TextsParsingSet).order_by(TextsParsingSet.id))
     parsing_sets = result.scalars().all()
     return templates.TemplateResponse("texts_parsing_sets.html", {"request": request, "user": user,
                                                                   "parsing_sets": parsing_sets})
@@ -118,8 +118,6 @@ async def generate_texts_endpoint(
         session: AsyncSession = Depends(get_async_session),
 ):
     if user:
-        print('task_strings: ', task_strings)
-        print('temperature: ', temperature)
         await generate_texts(author_id=user.id,
                              set_name=set_name,
                              temperature=temperature,
@@ -131,3 +129,45 @@ async def generate_texts_endpoint(
 
         return RedirectResponse(url='/', status_code=303)
     return templates.TemplateResponse("login.html", {"request": request})
+
+
+
+@app.get("/delete_text_set/{text_set_id}")
+async def get_text_set_for_delete(request: Request, user: User = Depends(fastapi_users.current_user()),
+                                  session: AsyncSession = Depends(get_async_session), text_set_id: int = None):
+    text_set_to_delete = await get_text_set(text_set_id=text_set_id, session=session)
+
+    if text_set_to_delete:
+        return templates.TemplateResponse("delete_parsing_set.html", {"request": request,
+                                                                      "set": text_set_to_delete,
+                                                                      "user": user})
+    else:
+        return Response(content="Text set not found", status_code=404)
+
+
+@app.post("/delete_text_set/{text_set_id}")
+async def delete_text_set(request: Request, user: User = Depends(fastapi_users.current_user()),
+                          session: AsyncSession = Depends(get_async_session), text_set_id: int = None):
+    text_set_to_delete = await get_text_set(text_set_id=text_set_id, session=session)
+    if text_set_to_delete:
+        await session.delete(text_set_to_delete)
+        await session.commit()
+    return RedirectResponse(url='/texts_list', status_code=303)
+
+
+@app.get("/download_text_set/{text_set_id}")
+async def download_text_set(request: Request, user: User = Depends(fastapi_users.current_user()),
+                            session: AsyncSession = Depends(get_async_session), text_set_id: int = None):
+
+    zip_buffer = await generate_text_set_zip(text_set_id=text_set_id, session=session)
+
+    # Create a generator to stream the content of BytesIO
+    def iterfile():
+        yield from zip_buffer
+
+    zip_buffer.seek(0)
+    headers = {
+        'Content-Disposition': f'attachment; filename="{text_set_id}.zip"'
+    }
+
+    return StreamingResponse(iterfile(), media_type='application/zip', headers=headers)

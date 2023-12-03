@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="p-3">Удаление набора текстов {{ set.set_name }}</h1>
+<p class="p-3">Вы уверены что хотите удалить набор {{ set.set_name }} ?</p>
+          <form action="/delete_text_set/{{ set.id }}" method="post">
+          <input type="submit" value='Удалить'>
+          </form>
+{% endblock %}

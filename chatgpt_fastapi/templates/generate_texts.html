@@ -7,17 +7,19 @@
 Каждое задание на текст должно начинаться с новой строки. После проверки результат будет на <a href="">этой странице</a>
 <form  class="form-group mt-3" action="/generate_texts" method="post">
       <label for="set_name">Название набора:</label><br>
-      <input type="text" id="set_name" name="set_name"><br>
+      <input type="text" id="set_name" name="set_name" value="1"><br>
       <label for="temperature">Температура:</label><br>
-      <input type="text" id="temperature" name="temperature"><br><br>
+      <input type="text" id="temperature" name="temperature" value="1"><br><br>
       <label for="text_len">Минимальная длина текста:</label><br>
-      <input type="text" id="text_len" name="text_len"><br><br>
+      <input type="text" id="text_len" name="text_len" value="1"><br><br>
       <label for="task_strings">Задание на тексты:</label><br>
       <textarea id="task_strings" name="task_strings" rows="4" cols="50"></textarea><br><br>
       <label for="rewriting_task">Задание на переписку текста:</label><br>
-      <textarea id="rewriting_task" name="rewriting_task" rows="4" cols="50"></textarea><br><br>
+      <textarea id="rewriting_task" name="rewriting_task" rows="4" cols="50">
+      Ниже будет текст, который нужно переписать так, чтобы увеличить его уникальность, сохраняя при этом его первоначальный смысл и информацию. Пожалуйста, перефразируй его таким образом, чтобы он заметно отличался по формулировкам, но оставался схожим по содержанию и сообщению, и в итоге получилась переписанная версия, которая будет уникальной и отличаться по фразировке и структуре от оригинала:
+      </textarea><br><br>
       <label for="required_uniqueness">Требуемый процент уникальности:</label><br>
-      <input type="text" id="required_uniqueness" name="required_uniqueness"><br><br>
+      <input type="text" id="required_uniqueness" name="required_uniqueness" value="10"><br><br>
     <button type="submit" class="btn btn-primary">Сгенерировать</button>
 </form>
 </div>
