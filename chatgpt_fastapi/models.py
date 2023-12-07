@@ -1,18 +1,11 @@
+from fastapi_users.db import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
     Column, String, Integer, Boolean, ForeignKey, Text, DateTime, Numeric
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.dialects.postgresql import UUID  # Import UUID
-import uuid  # Import Python's uuid module for default values
-from typing import AsyncGenerator
-
-from fastapi import Depends
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
 
 Base = declarative_base()
 

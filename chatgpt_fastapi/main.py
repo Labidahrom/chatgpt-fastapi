@@ -1,28 +1,19 @@
-from fastapi import FastAPI, Depends, Request, Form
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
-from starlette import status
-from starlette.responses import RedirectResponse
-from fastapi.responses import StreamingResponse
-from fastapi.responses import Response
-from typing import Type
-from chatgpt_fastapi.models import Base, TextsParsingSet, User
-from pydantic import BaseModel
-from chatgpt_fastapi.database import User, create_db_and_tables, get_async_session
+from chatgpt_fastapi.database import create_db_and_tables, get_async_session
+from chatgpt_fastapi.models import TextsParsingSet, User
 from chatgpt_fastapi.parser import generate_texts, get_text_set, generate_text_set_zip
-from chatgpt_fastapi.schemas import UserCreate, UserRead, UserUpdate, TextsParsingSetCreate, TextsParsingSetBase
+from chatgpt_fastapi.schemas import UserCreate, UserRead, UserUpdate
 from chatgpt_fastapi.users import auth_backend, current_active_user, fastapi_users
+from fastapi import BackgroundTasks, Depends, FastAPI, Form, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Type
 
-from fastapi import FastAPI, Depends
-
-from sqlalchemy import Column, Integer, String, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-import httpx
 
 app = FastAPI()
 current_user = fastapi_users.current_user()
-
 templates = Jinja2Templates(directory="chatgpt_fastapi/templates")
 
 
@@ -108,6 +99,7 @@ async def create_texts_task(request: Request, user: User = Depends(fastapi_users
 @app.post("/generate_texts")
 async def generate_texts_endpoint(
         request: Request,
+        background_tasks: BackgroundTasks,
         user: User = Depends(fastapi_users.current_user(optional=True)),
         set_name: str = Form(...),
         temperature: float = Form(...),
@@ -118,18 +110,19 @@ async def generate_texts_endpoint(
         session: AsyncSession = Depends(get_async_session),
 ):
     if user:
-        await generate_texts(author_id=user.id,
-                             set_name=set_name,
-                             temperature=temperature,
-                             task_strings=task_strings,
-                             rewriting_task=rewriting_task,
-                             required_uniqueness=required_uniqueness,
-                             text_len=text_len,
-                             session=session)
+        background_tasks.add_task(generate_texts,
+                                  author_id=user.id,
+                                  set_name=set_name,
+                                  temperature=temperature,
+                                  task_strings=task_strings,
+                                  rewriting_task=rewriting_task,
+                                  required_uniqueness=required_uniqueness,
+                                  text_len=text_len,
+                                  session=session
+                                  )
 
         return RedirectResponse(url='/', status_code=303)
     return templates.TemplateResponse("login.html", {"request": request})
-
 
 
 @app.get("/delete_text_set/{text_set_id}")
@@ -158,10 +151,8 @@ async def delete_text_set(request: Request, user: User = Depends(fastapi_users.c
 @app.get("/download_text_set/{text_set_id}")
 async def download_text_set(request: Request, user: User = Depends(fastapi_users.current_user()),
                             session: AsyncSession = Depends(get_async_session), text_set_id: int = None):
+    zip_buffer = await generate_text_set_zip(session=session, text_set_id=text_set_id)
 
-    zip_buffer = await generate_text_set_zip(text_set_id=text_set_id, session=session)
-
-    # Create a generator to stream the content of BytesIO
     def iterfile():
         yield from zip_buffer
 

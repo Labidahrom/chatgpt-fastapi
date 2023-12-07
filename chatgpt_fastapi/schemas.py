@@ -1,10 +1,7 @@
 from datetime import datetime
-from decimal import Decimal
-from typing import Optional, List
-from pydantic import BaseModel
 from fastapi_users import schemas
+from pydantic import BaseModel
 from uuid import UUID
-from chatgpt_fastapi.models import User
 
 
 class UserRead(schemas.BaseUser[UUID]):

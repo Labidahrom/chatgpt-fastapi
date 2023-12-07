@@ -1,19 +1,18 @@
-from chatgpt_fastapi.models import Base, TextsParsingSet, User
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
-import typing
-from fastapi import FastAPI, Depends
-
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from chatgpt_fastapi.models import Base, User
 from dotenv import load_dotenv
+from fastapi import Depends
+from fastapi_users.db import SQLAlchemyUserDatabase
 import os
-from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+import typing
+
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-
 engine = create_async_engine(DATABASE_URL)
 async_session_maker = async_sessionmaker(engine)
+
 
 async def create_db_and_tables():
     async with engine.begin() as conn:

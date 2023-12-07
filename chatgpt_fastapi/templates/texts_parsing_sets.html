@@ -20,8 +20,8 @@
                     <tr>
                         <td><a href="/download_text_set/{{ set.id }}">{{ set.id }}</a></td>
                         <td>{{ set.set_name }}</td>
-                        <td>{{ set.total_amount }}</td>
-                        <td>{{ set.parsed_amount }}</td>
+                        <td>{{ set.parsed_amount }} из {{ set.total_amount }}</td>
+                        <td>{{ set.is_complete }}</td>
                         <td>{{ set.average_uniqueness }}</td>
                         <td>{{ set.temperature }}</td>
                         <td>{{ set.created_at }}</td>
