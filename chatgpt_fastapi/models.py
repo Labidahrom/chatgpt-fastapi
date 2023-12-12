@@ -18,8 +18,8 @@ class TextsParsingSet(Base):
     __tablename__ = 'texts_parsing_set'
 
     id = Column(Integer, primary_key=True)
-    author = relationship('User', backref='texts_parsing_sets')
-    author_id = Column(UUID(as_uuid=True), ForeignKey('user.id'), nullable=False)
+    # author = relationship('User', backref='texts_parsing_sets')
+    author = Column(UUID(as_uuid=True), ForeignKey('user.id'), nullable=False)
     average_attempts_to_uniqueness = Column(Integer, default=0)
     average_uniqueness = Column(Integer, default=0)
     created_at = Column(DateTime, default=func.now())

@@ -1,6 +1,6 @@
 from chatgpt_fastapi.database import create_db_and_tables, get_async_session
 from chatgpt_fastapi.models import TextsParsingSet, User
-from chatgpt_fastapi.api_utils import generate_texts, get_text_set, generate_text_set_zip
+from chatgpt_fastapi.services import generate_texts, get_text_set, generate_text_set_zip
 from chatgpt_fastapi.schemas import UserCreate, UserRead, UserUpdate
 from chatgpt_fastapi.users import auth_backend, fastapi_users
 from fastapi import BackgroundTasks, Depends, FastAPI, Form, Request, status
@@ -66,11 +66,13 @@ async def logout(request: Request):
 
 
 @app.get("/texts_list", response_class=HTMLResponse)
-async def read_texts_parsing_sets(request: Request,
+async def list_texts_parsing_sets(request: Request,
                                   session: AsyncSession = Depends(get_async_session),
                                   user: User = Depends(fastapi_users.current_user())):
-    result = await session.execute(select(TextsParsingSet).order_by(TextsParsingSet.id))
-    parsing_sets = result.scalars().all()
+    result = await session.execute(select(TextsParsingSet, User.email)
+                                   .join(User, TextsParsingSet.author == User.id)
+                                   .order_by(TextsParsingSet.id))
+    parsing_sets = result.all()
     return templates.TemplateResponse("texts_parsing_sets.html",
                                       {"parsing_sets": parsing_sets,
                                        "request": request,
@@ -130,7 +132,7 @@ async def create_texts_task(request: Request, user: User = Depends(fastapi_users
 
 
 @app.post("/generate_texts")
-async def generate_texts_endpoint(
+async def send_generate_texts_form(
         request: Request,
         background_tasks: BackgroundTasks,
         required_uniqueness: float = Form(...),
@@ -144,7 +146,7 @@ async def generate_texts_endpoint(
 ):
     if user:
         background_tasks.add_task(generate_texts,
-                                  author_id=user.id,
+                                  author=user.id,
                                   required_uniqueness=required_uniqueness,
                                   rewriting_task=rewriting_task,
                                   session=session,
@@ -156,6 +158,3 @@ async def generate_texts_endpoint(
 
         return RedirectResponse(url='/', status_code=303)
     return templates.TemplateResponse("login.html", {"request": request})
-
-
-

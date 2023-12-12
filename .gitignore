@@ -5,4 +5,3 @@ dist
 .idea
 *.sqlite3
 *.log
-add_new_user.py

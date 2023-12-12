@@ -1,18 +1,13 @@
 import asyncio
-
-from chatgpt_fastapi.api_utils import get_text_from_openai
+from chatgpt_fastapi.api_utils import add_text, get_text_from_openai, get_text_uniqueness, raise_uniqueness
 from chatgpt_fastapi.database import get_async_session
 from chatgpt_fastapi.models import TextsParsingSet, Text, User
-from chatgpt_fastapi.randomizer import RANDOMIZER_STRINGS
 from dotenv import load_dotenv
 from fastapi import Depends
-from httpx import AsyncClient
 from io import BytesIO
 import logging
-import openai
 import os
 import psutil
-import random
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -21,9 +16,6 @@ import zipfile
 
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API")
-TEXTRU_KEY = os.getenv("TEXTRU_KEY")
-TEXTRU_URL = os.getenv("TEXTRU_URL")
 LOG_LEVEL = os.getenv("LOG_LEVEL")
 
 log_levels = {
@@ -41,6 +33,22 @@ logging.basicConfig(
 )
 
 
+async def get_system_usage():
+    cpu_usage = await asyncio.to_thread(psutil.cpu_percent, interval=1, percpu=True)
+    memory_usage = await asyncio.to_thread(psutil.virtual_memory)
+    swap_memory_usage = await asyncio.to_thread(psutil.swap_memory)
+
+    return (f"CPU Usage:\n{cpu_usage}\n"
+            f"Memory usage:\n{memory_usage}\n"
+            f"Swap usage:\n{swap_memory_usage}")
+
+
+async def get_text_set(session: AsyncSession = Depends(get_async_session), text_set_id: int = None):
+    text_set_query = select(TextsParsingSet).where(TextsParsingSet.id == text_set_id)
+    result = await session.execute(text_set_query)
+    return result.scalars().first()
+
+
 async def generate_text(
         header: str,
         rewriting_task: str,
@@ -55,7 +63,7 @@ async def generate_text(
     if not text:
         error_details = openai_response.get('status')
         logging.error(f"{header}: Can't get text from OpenAI server: {error_details}. "
-                      f"System usage:\n{await log_system_usage()}")
+                      f"System usage:\n{await get_system_usage()}")
         return error_details
 
     add_text_counter = 0
@@ -70,7 +78,7 @@ async def generate_text(
         else:
             error_details = openai_response.get('status')
             logging.error(f"{header}: During adding text can't get response from OpenAI server: "
-                          f"{error_details}\nSystem usage:\n{await log_system_usage()}")
+                          f"{error_details}\nSystem usage:\n{await get_system_usage()}")
             # protection against duplicate requests has worked, break and leave the current text
 
             break
@@ -80,7 +88,7 @@ async def generate_text(
         uniqueness_check_status = 'да'
     else:
         logging.error(f"{header}: Can't get text uniqueness from text.ru server. System usage:"
-                      f"\n{await log_system_usage()}")
+                      f"\n{await get_system_usage()}")
 
         uniqueness_check_status = 'нет'
 
@@ -97,7 +105,7 @@ async def generate_text(
             error_details = openai_response.get('status')
             logging.error(f"{header}: During rewrite text for uniqueness can't get "
                           f"response from OpenAI server: {error_details}\nSystem usage:"
-                          f"\n{await log_system_usage()}")
+                          f"\n{await get_system_usage()}")
             # protection against duplicate requests has worked, break and leave the current text
 
             break
@@ -109,7 +117,7 @@ async def generate_text(
             uniqueness_check_status = 'да'
         else:
             logging.error(f"{header}: Can't get text uniqueness from text.ru server. "
-                          f"System usage:\n{await log_system_usage()}")
+                          f"System usage:\n{await get_system_usage()}")
             uniqueness_check_status = 'нет, дана уникальность предыдущей версии текста'
             # text.ru doesn't respond, leave previous uniqueness
             break
@@ -152,7 +160,7 @@ async def generate_text_set_zip(session: AsyncSession, text_set_id: int):
     return buffer
 
 
-async def generate_texts(author_id: UUID,
+async def generate_texts(author: UUID,
                          rewriting_task: str,
                          required_uniqueness: float,
                          set_name: str,
@@ -160,14 +168,14 @@ async def generate_texts(author_id: UUID,
                          temperature: float,
                          text_len: int,
                          session: AsyncSession = Depends(get_async_session)):
-    logging.info(f"{set_name}: Starting text set generation\n{await log_system_usage()}")
+    logging.info(f"{set_name}: Starting text set generation\n{await get_system_usage()}")
 
     task_list = [task for task in task_strings.split('\n') if "||" in task]
 
-    author = await session.get(User, author_id)
+    author = await session.get(User, author)
 
     new_set = TextsParsingSet(
-        author=author,
+        author=author.id,
         set_name=set_name,
         task_strings=task_strings,
         temperature=temperature,
@@ -209,18 +217,18 @@ async def generate_texts(author_id: UUID,
                                                  f"Была ли получена уникальность текста? - "
                                                  f"{text_data['uniqueness_check_status']}\n")
 
-            new_set.parsed_amount += 1
-            await session.commit()
-            await session.refresh(new_set)
+        new_set.parsed_amount += 1
+        await session.commit()
+        await session.refresh(new_set)
 
     avg_uniqueness = await session.execute(
         select(func.avg(Text.uniqueness)).where(Text.parsing_set_id == new_set.id)
     )
-    avg_attempts = await session.execute(
+    average_attempts_to_uniqueness = await session.execute(
         select(func.avg(Text.attempts_to_uniqueness)).where(Text.parsing_set_id == new_set.id)
     )
 
-    new_set.average_attempts_to_uniqueness = avg_attempts.scalar_one() or 0
+    new_set.average_attempts_to_uniqueness = average_attempts_to_uniqueness .scalar_one() or 0
     new_set.average_uniqueness = avg_uniqueness.scalar_one() or 0
     new_set.is_complete = True
 

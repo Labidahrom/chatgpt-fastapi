@@ -19,8 +19,11 @@ fastapi-users = {extras = ["sqlalchemy"], version = "^12.1.2"}
 httpx = "^0.25.1"
 openai = "^1.2.3"
 psutil = "^5.9.6"
-
+flake8 = "^6.1.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[flake8]
+exclude = ".venv"

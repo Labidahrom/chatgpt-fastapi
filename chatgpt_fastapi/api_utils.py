@@ -1,61 +1,19 @@
 import asyncio
-from chatgpt_fastapi.database import get_async_session
-from chatgpt_fastapi.models import TextsParsingSet, Text, User
 from chatgpt_fastapi.randomizer import RANDOMIZER_STRINGS
 from dotenv import load_dotenv
-from fastapi import Depends
 from httpx import AsyncClient
-from io import BytesIO
-import logging
 import openai
 import os
-import psutil
 import random
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from uuid import UUID
-import zipfile
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API")
 TEXTRU_KEY = os.getenv("TEXTRU_KEY")
 TEXTRU_URL = os.getenv("TEXTRU_URL")
-LOG_LEVEL = os.getenv("LOG_LEVEL")
-
-log_levels = {
-    "DEBUG": logging.DEBUG,
-    "INFO": logging.INFO,
-    "WARNING": logging.WARNING,
-    "ERROR": logging.ERROR,
-    "CRITICAL": logging.CRITICAL
-}
-
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='parser.log',
-    level=log_levels.get(LOG_LEVEL, logging.ERROR)
-)
-
-
-async def log_system_usage():
-    cpu_usage = await asyncio.to_thread(psutil.cpu_percent, interval=1, percpu=True)
-    memory_usage = await asyncio.to_thread(psutil.virtual_memory)
-    swap_memory_usage = await asyncio.to_thread(psutil.swap_memory)
-
-    return (f"CPU Usage:\n{cpu_usage}\n"
-            f"Memory usage:\n{memory_usage}\n"
-            f"Swap usage:\n{swap_memory_usage}")
 
 
 async def add_randomize_task(randomize_strings):
     return '\n'.join([random.choice(strings) for strings in randomize_strings])
-
-
-async def get_text_set(session: AsyncSession = Depends(get_async_session), text_set_id: int = None):
-    text_set_query = select(TextsParsingSet).where(TextsParsingSet.id == text_set_id)
-    result = await session.execute(text_set_query)
-    return result.scalars().first()
 
 
 async def make_async_textru_call(*args, **kwargs):
@@ -133,14 +91,14 @@ async def get_text_uniqueness(text):
         "userkey": TEXTRU_KEY
     }
     while attempts < 10:
+        # due to the slow work of text.ru api, we wait and periodically send request to
+        # server until we get right response
         attempts += 1
-        if attempts < 5:
+        if attempts <= 5:
+            # first five attempts have longer time intervals
             await asyncio.sleep(20)
         await asyncio.sleep(60)
         response = await make_async_textru_call(TEXTRU_URL, json=uid_data, headers=headers)
         if 'text_unique' in response.json():
             return float(response.json()["text_unique"])
     return 0
-
-
-

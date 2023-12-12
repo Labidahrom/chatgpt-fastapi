@@ -33,12 +33,11 @@ class TextsParsingSetBase(BaseModel):
 
 
 class TextsParsingSetCreate(TextsParsingSetBase):
-    author_id: UUID
+    author: UUID
 
 
 class TextsParsingSet(TextsParsingSetBase):
     id: int
-    author: UserRead
     created_at: datetime
 
     class Config:

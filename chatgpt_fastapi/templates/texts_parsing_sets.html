@@ -7,6 +7,7 @@
                 <tr>
                     <th>ID</th>
                     <th>Название</th>
+                    <th>Автор</th>
                     <th>Всего текстов</th>
                     <th>Готово</th>
                     <th>Средняя уникальность</th>
@@ -16,10 +17,11 @@
                 </tr>
             </thead>
             <tbody>
-                {% for set in parsing_sets %}
+                {% for set, author_email in parsing_sets %}
                     <tr>
                         <td><a href="/download_text_set/{{ set.id }}">{{ set.id }}</a></td>
                         <td>{{ set.set_name }}</td>
+                        <td>{{ author_email }}</td>
                         <td>{{ set.parsed_amount }} из {{ set.total_amount }}</td>
                         <td>{{ set.is_complete }}</td>
                         <td>{{ set.average_uniqueness }}</td>
