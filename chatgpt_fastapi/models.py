@@ -1,11 +1,11 @@
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
-    Column, String, Integer, Boolean, ForeignKey, Text, DateTime, Numeric
+    Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String
 )
+from sqlalchemy import Text as TextType
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
-
 
 Base = declarative_base()
 
@@ -18,19 +18,19 @@ class TextsParsingSet(Base):
     __tablename__ = 'texts_parsing_set'
 
     id = Column(Integer, primary_key=True)
-    set_name = Column(String(500))
-    total_amount = Column(Integer)
-    parsed_amount = Column(Integer, default=0)
-    is_complete = Column(Boolean, default=False)
-    author_id = Column(UUID(as_uuid=True), ForeignKey('user.id'), nullable=False)
-    average_uniqueness = Column(Integer, default=0)
-    average_attempts_to_uniqueness = Column(Integer, default=0)
-    temperature = Column(Numeric(2,1), default=0)
-    created_at = Column(DateTime, default=func.now())
-    failed_texts = Column(Text, default='')
-    low_uniqueness_texts = Column(Text, default='')
-    task_strings = Column(Text, default='')
     author = relationship('User', backref='texts_parsing_sets')
+    author_id = Column(UUID(as_uuid=True), ForeignKey('user.id'), nullable=False)
+    average_attempts_to_uniqueness = Column(Integer, default=0)
+    average_uniqueness = Column(Integer, default=0)
+    created_at = Column(DateTime, default=func.now())
+    failed_texts = Column(TextType, default='')
+    is_complete = Column(Boolean, default=False)
+    low_uniqueness_texts = Column(TextType, default='')
+    parsed_amount = Column(Integer, default=0)
+    set_name = Column(String(500))
+    task_strings = Column(TextType, default='')
+    temperature = Column(Numeric(2, 1), default=0)
+    total_amount = Column(Integer)
 
     def __str__(self):
         return self.set_name
@@ -40,15 +40,14 @@ class Text(Base):
     __tablename__ = 'text'
 
     id = Column(Integer, primary_key=True)
-    header = Column(Text)
-    text = Column(Text)
-    chat_request = Column(Text)
-    uniqueness = Column(Integer)
     attempts_to_uniqueness = Column(Integer)
-    parsing_set_id = Column(Integer, ForeignKey('texts_parsing_set.id'), nullable=False)
+    chat_request = Column(TextType)
     created_at = Column(DateTime, default=func.now())
-
+    header = Column(TextType)
     parsing_set = relationship('TextsParsingSet', backref='texts')
+    parsing_set_id = Column(Integer, ForeignKey('texts_parsing_set.id'), nullable=False)
+    text = Column(TextType)
+    uniqueness = Column(Integer)
 
     def __str__(self):
         return self.header

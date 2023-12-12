@@ -1,7 +1,9 @@
 import asyncio
-from chatgpt_fastapi.randomizer import add_randomize_task
+
+from chatgpt_fastapi.api_utils import get_text_from_openai
 from chatgpt_fastapi.database import get_async_session
 from chatgpt_fastapi.models import TextsParsingSet, Text, User
+from chatgpt_fastapi.randomizer import RANDOMIZER_STRINGS
 from dotenv import load_dotenv
 from fastapi import Depends
 from httpx import AsyncClient
@@ -9,6 +11,8 @@ from io import BytesIO
 import logging
 import openai
 import os
+import psutil
+import random
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -19,7 +23,7 @@ import zipfile
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API")
 TEXTRU_KEY = os.getenv("TEXTRU_KEY")
-TEXTRU_URL = "http://api.text.ru/post"
+TEXTRU_URL = os.getenv("TEXTRU_URL")
 LOG_LEVEL = os.getenv("LOG_LEVEL")
 
 log_levels = {
@@ -37,97 +41,6 @@ logging.basicConfig(
 )
 
 
-async def get_text_set(session: AsyncSession = Depends(get_async_session), text_set_id: int = None):
-    text_set_query = select(TextsParsingSet).where(TextsParsingSet.id == text_set_id)
-    result = await session.execute(text_set_query)
-    return result.scalars().first()
-
-
-async def make_async_textru_call(*args, **kwargs):
-    async with AsyncClient() as client:
-        result = await client.post(*args, **kwargs)
-    return result
-
-
-async def get_text_from_chat(task, temperature):
-    await asyncio.sleep(3)
-    randomize_string = await add_randomize_task()
-    full_task = task + '\n' + randomize_string
-    client = openai.AsyncOpenAI(
-        api_key=OPENAI_API_KEY,
-    )
-    try:
-        text_request = await client.chat.completions.create(
-            messages=[
-                {
-                    "role": "user",
-                    "content": full_task,
-                }
-            ],
-            model="gpt-3.5-turbo",
-            temperature=float(temperature)
-        )
-        text = str(text_request.choices[0].message.content)
-        status = 'ok'
-        return {
-            'text': text,
-            'status': status
-        }
-    except openai.RateLimitError as e:
-        error_details = f'Rate limit error: {e}'
-    except openai.AuthenticationError as e:
-        error_details = f'Authentication token error: {e}'
-    except openai.APIConnectionError as e:
-        error_details = f'Unable to connect to OpenAI server: {e}'
-    except Exception as e:
-        error_details = f'General OpenAI error: {e}'
-    return {
-        'text': None,
-        'status': error_details
-    }
-
-
-async def add_text(text, text_len):
-    task = (f'Допиши пожалуйста следующий текст,'
-            f'что бы его длина составила {text_len}'
-            f' символов или больше:\n{text}')
-    return await get_text_from_chat(task, temperature=1)
-
-
-async def raise_uniqueness(text, rewriting_task):
-    task = f'{rewriting_task}\n{text}'
-    return await get_text_from_chat(task, temperature=1)
-
-
-async def get_text_uniqueness(text):
-    await asyncio.sleep(20)
-    headers = {
-        "Content-Type": "application/json"
-    }
-    text_data = {
-        "text": text,
-        "userkey": TEXTRU_KEY
-    }
-    response = await make_async_textru_call(TEXTRU_URL, json=text_data, headers=headers)
-    uid = response.json().get('text_uid')
-    if not uid:
-        return 0
-    attempts = 0
-    uid_data = {
-        "uid": uid,
-        "userkey": TEXTRU_KEY
-    }
-    while attempts < 10:
-        attempts += 1
-        if attempts < 5:
-            await asyncio.sleep(20)
-        await asyncio.sleep(60)
-        response = await make_async_textru_call(TEXTRU_URL, json=uid_data, headers=headers)
-        if 'text_unique' in response.json():
-            return float(response.json()["text_unique"])
-    return 0
-
-
 async def generate_text(
         header: str,
         rewriting_task: str,
@@ -135,13 +48,14 @@ async def generate_text(
         task: str,
         temperature: float,
         text_len: int
-        ):
+):
     logging.info(f"{header}: Starting text generation")
-    openai_response = await get_text_from_chat(task, temperature)
+    openai_response = await get_text_from_openai(task, temperature)
     text = openai_response.get('text')
     if not text:
         error_details = openai_response.get('status')
-        logging.error(f"{header}: Can't get text from OpenAI server: {error_details}")
+        logging.error(f"{header}: Can't get text from OpenAI server: {error_details}. "
+                      f"System usage:\n{await log_system_usage()}")
         return error_details
 
     add_text_counter = 0
@@ -156,15 +70,18 @@ async def generate_text(
         else:
             error_details = openai_response.get('status')
             logging.error(f"{header}: During adding text can't get response from OpenAI server: "
-                          f"{error_details}")
+                          f"{error_details}\nSystem usage:\n{await log_system_usage()}")
             # protection against duplicate requests has worked, break and leave the current text
+
             break
 
     text_uniqueness = await get_text_uniqueness(text)
     if text_uniqueness:
         uniqueness_check_status = 'да'
     else:
-        logging.error(f"{header}: Can't get text uniqueness from text.ru server")
+        logging.error(f"{header}: Can't get text uniqueness from text.ru server. System usage:"
+                      f"\n{await log_system_usage()}")
+
         uniqueness_check_status = 'нет'
 
     make_text_unique_counter = 0
@@ -178,9 +95,11 @@ async def generate_text(
             text = new_text
         else:
             error_details = openai_response.get('status')
-            logging.error(f"{header}: During rewrite text for uniqueness can't get response "
-                          f"from OpenAI server: {error_details}")
+            logging.error(f"{header}: During rewrite text for uniqueness can't get "
+                          f"response from OpenAI server: {error_details}\nSystem usage:"
+                          f"\n{await log_system_usage()}")
             # protection against duplicate requests has worked, break and leave the current text
+
             break
         logging.info(f"{header}: rewrite text")
         new_text_uniqueness = await get_text_uniqueness(text)
@@ -189,7 +108,8 @@ async def generate_text(
             logging.info(f"{header}: get uniqueness for rewrite text: {text_uniqueness}")
             uniqueness_check_status = 'да'
         else:
-            logging.error(f"{header}: Can't get text uniqueness from text.ru server")
+            logging.error(f"{header}: Can't get text uniqueness from text.ru server. "
+                          f"System usage:\n{await log_system_usage()}")
             uniqueness_check_status = 'нет, дана уникальность предыдущей версии текста'
             # text.ru doesn't respond, leave previous uniqueness
             break
@@ -233,13 +153,15 @@ async def generate_text_set_zip(session: AsyncSession, text_set_id: int):
 
 
 async def generate_texts(author_id: UUID,
-                         set_name: str,
-                         temperature: float,
-                         task_strings: str,
                          rewriting_task: str,
                          required_uniqueness: float,
+                         set_name: str,
+                         task_strings: str,
+                         temperature: float,
                          text_len: int,
                          session: AsyncSession = Depends(get_async_session)):
+    logging.info(f"{set_name}: Starting text set generation\n{await log_system_usage()}")
+
     task_list = [task for task in task_strings.split('\n') if "||" in task]
 
     author = await session.get(User, author_id)
@@ -303,6 +225,4 @@ async def generate_texts(author_id: UUID,
     new_set.is_complete = True
 
     await session.commit()
-
-
-
+    logging.info(f"{set_name}: Finish text set generation")

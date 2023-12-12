@@ -16,43 +16,46 @@ class UserUpdate(schemas.BaseUserUpdate):
     pass
 
 
-
 class TextsParsingSetBase(BaseModel):
-    set_name: str
-    total_amount: int = 0
-    parsed_amount: int = 0
-    is_complete: bool = False
     average_uniqueness: int = 0
     average_attempts_to_uniqueness: int = 0
-    temperature: float = 0
     failed_texts: str = ''
+    is_complete: bool = False
     low_uniqueness_texts: str = ''
-    task_strings: str
+    parsed_amount: int = 0
     rewriting_task: str = ''
     required_uniqueness: int = 0
+    set_name: str
+    task_strings: str
+    temperature: float = 0
     text_len: int = 0
+    total_amount: int = 0
+
 
 class TextsParsingSetCreate(TextsParsingSetBase):
     author_id: UUID
 
+
 class TextsParsingSet(TextsParsingSetBase):
     id: int
-    created_at: datetime
     author: UserRead
+    created_at: datetime
 
     class Config:
         orm_mode = True
 
 
 class TextBase(BaseModel):
+    attempts_to_uniqueness: int
+    chat_request: str
     header: str
     text: str
-    chat_request: str
     uniqueness: int
-    attempts_to_uniqueness: int
+
 
 class TextCreate(TextBase):
     parsing_set_id: int
+
 
 class Text(TextBase):
     id: int
