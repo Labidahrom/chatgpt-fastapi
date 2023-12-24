@@ -1,5 +1,6 @@
 import asyncio
-from chatgpt_fastapi.api_utils import add_text, get_text_from_openai, get_text_uniqueness, raise_uniqueness
+from chatgpt_fastapi.api_utils import add_text, get_text_from_openai, \
+    get_text_uniqueness, raise_uniqueness
 from chatgpt_fastapi.database import get_async_session
 from chatgpt_fastapi.models import TextsParsingSet, Text, User
 from dotenv import load_dotenv
@@ -13,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from uuid import UUID
 import zipfile
-
 
 load_dotenv()
 LOG_LEVEL = os.getenv("LOG_LEVEL")
@@ -34,7 +34,8 @@ logging.basicConfig(
 
 
 async def get_system_usage():
-    cpu_usage = await asyncio.to_thread(psutil.cpu_percent, interval=1, percpu=True)
+    cpu_usage = await asyncio.to_thread(psutil.cpu_percent, interval=1,
+                                        percpu=True)
     memory_usage = await asyncio.to_thread(psutil.virtual_memory)
     swap_memory_usage = await asyncio.to_thread(psutil.swap_memory)
 
@@ -43,8 +44,10 @@ async def get_system_usage():
             f"Swap usage:\n{swap_memory_usage}")
 
 
-async def get_text_set(session: AsyncSession = Depends(get_async_session), text_set_id: int = None):
-    text_set_query = select(TextsParsingSet).where(TextsParsingSet.id == text_set_id)
+async def get_text_set(session: AsyncSession = Depends(get_async_session),
+                       text_set_id: int = None):
+    text_set_query = select(TextsParsingSet).where(
+        TextsParsingSet.id == text_set_id)
     result = await session.execute(text_set_query)
     return result.scalars().first()
 
@@ -62,64 +65,63 @@ async def generate_text(
     text = openai_response.get('text')
     if not text:
         error_details = openai_response.get('status')
-        logging.error(f"{header}: Can't get text from OpenAI server: {error_details}. "
-                      f"System usage:\n{await get_system_usage()}")
+        logging.error(
+            f"{header}: Can't get text from OpenAI server: {error_details}. "
+            f"System usage:\n{await get_system_usage()}")
         return error_details
 
     add_text_counter = 0
     while text_len and (len(text) + 100 < text_len) and add_text_counter < 3:
         add_text_counter += 1
-        logging.info(f"{header}: Low text length: {text_len}, trying to rewrite"
-                     f"{add_text_counter} time")
+        logging.info(
+            f"{header}: Low text length: {text_len}, trying to rewrite"
+            f"{add_text_counter} time")
         openai_response = await add_text(text, text_len)
         new_text = openai_response.get('text')
         if new_text:
             text = new_text
         else:
             error_details = openai_response.get('status')
-            logging.error(f"{header}: During adding text can't get response from OpenAI server: "
-                          f"{error_details}\nSystem usage:\n{await get_system_usage()}")
-            # protection against duplicate requests has worked, break and leave the current text
-
+            logging.error(
+                f"{header}: During adding text can't get response from OpenAI "
+                f"server: {error_details}\nSystem usage:\n"
+                f"{await get_system_usage()}")
+            # it seems protection against duplicate requests has worked,
+            # break and leave the current text
             break
 
-    text_uniqueness = await get_text_uniqueness(text)
-    if text_uniqueness:
-        uniqueness_check_status = 'да'
-    else:
-        logging.error(f"{header}: Can't get text uniqueness from text.ru server. System usage:"
-                      f"\n{await get_system_usage()}")
-
-        uniqueness_check_status = 'нет'
-
     make_text_unique_counter = 0
-    while text_uniqueness < float(required_uniqueness) and make_text_unique_counter <= 2:
+    while make_text_unique_counter <= 2:
+        if text_uniqueness := await get_text_uniqueness(text):
+            uniqueness_check_status = 'да'
+        else:
+            logging.error(
+                f"{header}: Can't get text uniqueness from text.ru server. "
+                f"System usage:\n{await get_system_usage()}")
+            uniqueness_check_status = 'нет'
+            uniqueness_check_status += (', дана уникальность предыдущей '
+                                        'версии текста') if (
+                    make_text_unique_counter != 0) else ''
+            break
+        if text_uniqueness >= float(required_uniqueness):
+            break
         make_text_unique_counter += 1
-        logging.info(f"{header}: Low uniqueness: {text_uniqueness}, trying to rewrite"
-                     f"{make_text_unique_counter} time")
+        logging.info(
+            f"{header}: Low uniqueness: {text_uniqueness}, trying to rewrite"
+            f"{make_text_unique_counter} time")
         openai_response = await raise_uniqueness(text, rewriting_task)
         new_text = openai_response.get('text')
+        logging.info(f"{header}: rewrite text")
         if new_text:
             text = new_text
         else:
             error_details = openai_response.get('status')
-            logging.error(f"{header}: During rewrite text for uniqueness can't get "
-                          f"response from OpenAI server: {error_details}\nSystem usage:"
-                          f"\n{await get_system_usage()}")
-            # protection against duplicate requests has worked, break and leave the current text
-
-            break
-        logging.info(f"{header}: rewrite text")
-        new_text_uniqueness = await get_text_uniqueness(text)
-        if new_text_uniqueness:
-            text_uniqueness = new_text_uniqueness
-            logging.info(f"{header}: get uniqueness for rewrite text: {text_uniqueness}")
-            uniqueness_check_status = 'да'
-        else:
-            logging.error(f"{header}: Can't get text uniqueness from text.ru server. "
-                          f"System usage:\n{await get_system_usage()}")
-            uniqueness_check_status = 'нет, дана уникальность предыдущей версии текста'
-            # text.ru doesn't respond, leave previous uniqueness
+            logging.error(
+                f"{header}: During rewrite text for uniqueness can't get "
+                f"response from OpenAI server: {error_details}\nSystem usage:"
+                f"\n{await get_system_usage()}")
+            # it seems protection against duplicate requests has worked,
+            # break and leave the current text
             break
 
     logging.info(f"{header}: Text generation completed")
@@ -134,8 +136,10 @@ async def generate_text(
 async def generate_text_set_zip(session: AsyncSession, text_set_id: int):
     buffer = BytesIO()
 
-    text_set_query = select(TextsParsingSet).options(selectinload(TextsParsingSet.texts)).where(
-        TextsParsingSet.id == text_set_id)
+    text_set_query = (
+        select(TextsParsingSet).options(
+            selectinload(TextsParsingSet.texts)).where(
+            TextsParsingSet.id == text_set_id))
     result = await session.execute(text_set_query)
     text_set = result.scalars().first()
 
@@ -154,7 +158,8 @@ async def generate_text_set_zip(session: AsyncSession, text_set_id: int):
         if failed_texts:
             zipf.writestr("не получились.txt", failed_texts)
         if low_uniqueness_texts:
-            zipf.writestr("тексты с низкой уникальностью.txt", low_uniqueness_texts)
+            zipf.writestr("тексты с низкой уникальностью.txt",
+                          low_uniqueness_texts)
 
     buffer.seek(0)
     return buffer
@@ -168,7 +173,8 @@ async def generate_texts(author: UUID,
                          temperature: float,
                          text_len: int,
                          session: AsyncSession = Depends(get_async_session)):
-    logging.info(f"{set_name}: Starting text set generation\n{await get_system_usage()}")
+    logging.info(
+        f"{set_name}:Starting text set generation\n{await get_system_usage()}")
 
     task_list = [task for task in task_strings.split('\n') if "||" in task]
 
@@ -213,22 +219,26 @@ async def generate_texts(author: UUID,
             new_set.failed_texts += f'{task}&&{text_data}\n'
 
             if text_data['text_uniqueness'] < required_uniqueness:
-                new_set.low_uniqueness_texts += (f"{task}||{text_data['text_uniqueness']}||"
-                                                 f"Была ли получена уникальность текста? - "
-                                                 f"{text_data['uniqueness_check_status']}\n")
+                new_set.low_uniqueness_texts += (
+                    f"{task}||{text_data['text_uniqueness']}||"
+                    f"Была ли получена уникальность текста? - "
+                    f"{text_data['uniqueness_check_status']}\n")
 
         new_set.parsed_amount += 1
         await session.commit()
         await session.refresh(new_set)
 
     avg_uniqueness = await session.execute(
-        select(func.avg(Text.uniqueness)).where(Text.parsing_set_id == new_set.id)
+        select(func.avg(Text.uniqueness)).where(
+            Text.parsing_set_id == new_set.id)
     )
     average_attempts_to_uniqueness = await session.execute(
-        select(func.avg(Text.attempts_to_uniqueness)).where(Text.parsing_set_id == new_set.id)
+        select(func.avg(Text.attempts_to_uniqueness)).where(
+            Text.parsing_set_id == new_set.id)
     )
 
-    new_set.average_attempts_to_uniqueness = average_attempts_to_uniqueness .scalar_one() or 0
+    new_set.average_attempts_to_uniqueness = (
+            average_attempts_to_uniqueness.scalar_one() or 0)
     new_set.average_uniqueness = avg_uniqueness.scalar_one() or 0
     new_set.is_complete = True
 

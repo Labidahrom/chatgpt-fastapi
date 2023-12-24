@@ -45,7 +45,8 @@ class Text(Base):
     created_at = Column(DateTime, default=func.now())
     header = Column(TextType)
     parsing_set = relationship('TextsParsingSet', backref='texts')
-    parsing_set_id = Column(Integer, ForeignKey('texts_parsing_set.id'), nullable=False)
+    parsing_set_id = Column(Integer, ForeignKey('texts_parsing_set.id'),
+                            nullable=False)
     text = Column(TextType)
     uniqueness = Column(Integer)
 

@@ -18,7 +18,6 @@
 <script>
 async function submitLoginForm(event) {
     event.preventDefault();
-    console.log("Form submission intercepted"); // Log for debugging
 
     const formData = new FormData(event.target);
     const response = await fetch('/auth/jwt/login', {
@@ -27,7 +26,6 @@ async function submitLoginForm(event) {
     });
 
     if (response.ok) {
-        console.log("Login successful, redirecting...");
         window.location.href = '/';
     } else {
         console.log("Login failed", response.status, response.statusText); // Log error details

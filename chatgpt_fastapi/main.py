@@ -1,10 +1,12 @@
 from chatgpt_fastapi.database import create_db_and_tables, get_async_session
 from chatgpt_fastapi.models import TextsParsingSet, User
-from chatgpt_fastapi.services import generate_texts, get_text_set, generate_text_set_zip
+from chatgpt_fastapi.services import (generate_texts, get_text_set,
+                                      generate_text_set_zip)
 from chatgpt_fastapi.schemas import UserCreate, UserRead, UserUpdate
 from chatgpt_fastapi.users import auth_backend, fastapi_users
 from fastapi import BackgroundTasks, Depends, FastAPI, Form, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import (HTMLResponse, RedirectResponse, Response,
+                               StreamingResponse)
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,12 +48,17 @@ async def on_startup():
 
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request, user: User = Depends(fastapi_users.current_user(optional=True))):
-    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+async def home(request: Request,
+               user: User = Depends(fastapi_users.current_user(
+                   optional=True))):
+    return templates.TemplateResponse("index.html", {"request": request,
+                                                     "user": user})
 
 
 @app.get("/login", response_class=HTMLResponse)
-async def login(request: Request, user: User = Depends(fastapi_users.current_user(optional=True))):
+async def login(request: Request,
+                user: User = Depends(fastapi_users.current_user(
+                    optional=True))):
     if user:
         response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
         return response
@@ -66,11 +73,12 @@ async def logout(request: Request):
 
 
 @app.get("/texts_list", response_class=HTMLResponse)
-async def list_texts_parsing_sets(request: Request,
-                                  session: AsyncSession = Depends(get_async_session),
-                                  user: User = Depends(fastapi_users.current_user())):
+async def list_text_sets(request: Request,
+                         session: AsyncSession = Depends(get_async_session),
+                         user: User = Depends(fastapi_users.current_user())):
     result = await session.execute(select(TextsParsingSet, User.email)
-                                   .join(User, TextsParsingSet.author == User.id)
+                                   .join(User,
+                                         TextsParsingSet.author == User.id)
                                    .order_by(TextsParsingSet.id))
     parsing_sets = result.all()
     return templates.TemplateResponse("texts_parsing_sets.html",
@@ -81,15 +89,19 @@ async def list_texts_parsing_sets(request: Request,
 
 @app.get("/delete_text_set/{text_set_id}")
 async def get_text_set_for_delete(request: Request,
-                                  session: AsyncSession = Depends(get_async_session),
+                                  session: AsyncSession = Depends(
+                                      get_async_session),
                                   text_set_id: int = None,
-                                  user: User = Depends(fastapi_users.current_user())):
-    text_set_to_delete = await get_text_set(session=session, text_set_id=text_set_id)
+                                  user: User = Depends(
+                                      fastapi_users.current_user())):
+    text_set_to_delete = await get_text_set(session=session,
+                                            text_set_id=text_set_id)
 
     if text_set_to_delete:
-        return templates.TemplateResponse("delete_parsing_set.html", {"request": request,
-                                                                      "set": text_set_to_delete,
-                                                                      "user": user})
+        return templates.TemplateResponse("delete_parsing_set.html",
+                                          {"request": request,
+                                           "set": text_set_to_delete,
+                                           "user": user})
     else:
         return Response(content="Text set not found", status_code=404)
 
@@ -99,7 +111,8 @@ async def delete_text_set(request: Request,
                           session: AsyncSession = Depends(get_async_session),
                           text_set_id: int = None,
                           user: User = Depends(fastapi_users.current_user())):
-    text_set_to_delete = await get_text_set(session=session, text_set_id=text_set_id)
+    text_set_to_delete = await get_text_set(session=session,
+                                            text_set_id=text_set_id)
     if text_set_to_delete:
         await session.delete(text_set_to_delete)
         await session.commit()
@@ -110,8 +123,10 @@ async def delete_text_set(request: Request,
 async def download_text_set(request: Request,
                             session: AsyncSession = Depends(get_async_session),
                             text_set_id: int = None,
-                            user: User = Depends(fastapi_users.current_user())):
-    zip_buffer = await generate_text_set_zip(session=session, text_set_id=text_set_id)
+                            user: User = Depends(
+                                fastapi_users.current_user())):
+    zip_buffer = await generate_text_set_zip(session=session,
+                                             text_set_id=text_set_id)
 
     def iterfile():
         yield from zip_buffer
@@ -121,13 +136,17 @@ async def download_text_set(request: Request,
         'Content-Disposition': f'attachment; filename="{text_set_id}.zip"'
     }
 
-    return StreamingResponse(iterfile(), headers=headers, media_type='application/zip')
+    return StreamingResponse(iterfile(), headers=headers,
+                             media_type='application/zip')
 
 
 @app.get("/generate_texts", response_class=HTMLResponse)
-async def create_texts_task(request: Request, user: User = Depends(fastapi_users.current_user(optional=True))):
+async def create_texts_task(request: Request,
+                            user: User = Depends(
+                                fastapi_users.current_user(optional=True))):
     if user:
-        return templates.TemplateResponse("generate_texts.html", {"request": request, "user": user})
+        return templates.TemplateResponse("generate_texts.html",
+                                          {"request": request, "user": user})
     return templates.TemplateResponse("login.html", {"request": request})
 
 
